@@ -1,0 +1,154 @@
+const express = require("express");
+const bodyPaser= require("body-parser");
+const mongoose=require("mongoose");
+const _=require("lodash");
+mongoose.set("strictQuery", false);
+const app=express();
+
+// let items=["bay food","cook food"];
+// let workItems=[];
+app.set('view engine', 'ejs');
+app.use(bodyPaser.urlencoded({extended:true}));
+app.use(express.static("public"));
+
+mongoose.connect('mongodb+srv://damith:Damith%401994@cluster0.jsvzsuu.mongodb.net/todolistDB'),{useNewUrlParser:true};
+
+const itemsSchema={
+    name:String
+};
+
+const Item=mongoose.model("Item",itemsSchema);
+
+
+const item1=new Item({
+    name:"welcome todolist"
+});
+const item2=new Item({
+    name:"welcome itm 2"
+});
+const item3=new Item({
+    name:"welcom itm 3"
+});
+
+const defaultItems=[item1,item2,item3];
+
+const listSchema={
+    name:String,
+    items:[itemsSchema]
+};
+const List=mongoose.model("List",listSchema);
+
+
+
+
+
+app.get("/",function(req,res){
+
+Item.find({},function(err,foundItems){
+if(foundItems.length===0){
+    Item.insertMany(defaultItems,function(err){
+    if (err){
+        console.log(err);
+    }else{
+        console.log("success");
+    }
+}); 
+res.redirect("/");
+}else{
+
+
+    res.render("list",{listTitle:"today",newListItems:foundItems});
+}
+
+})
+   
+});
+
+app.get("/:customListName",function(req,res){
+    const customListName=_.capitalize(req.params.customListName);
+
+    List.findOne({name:customListName},function(err,foundList){
+        if(!err){
+         if(!foundList){
+             const list = new List({
+                    name:customListName,
+                    items:defaultItems
+       
+             });
+             list.save();
+             res.redirect("/"+customListName);
+            }else{
+                res.render("list",{listTitle: foundList.name,newListItems:foundList.items});
+        }
+               
+    }      
+                });
+            // list.save();
+            
+            
+    //             res.redirect("/"+customListName);
+    //         }else{
+    //             res.render("list")
+    //               res.render("list",{listTitle: foundList.name,newListItems:foundList.items});
+    //         }
+    //     }
+    // });
+
+    
+})
+
+app.post("/", function(req,res){
+ const itemName= req.body.newItem;
+ const listName=req.body.list;
+
+ const item=new Item({
+    name:itemName
+ });
+if(listName==="today"){
+    item.save();
+ res.redirect("/"); 
+} else{
+ List.findOne({name:listName},function(err,foundList){
+    foundList.items.push(item);
+    foundList.save();
+    res.redirect("/"+listName);
+  });
+}
+
+
+})
+app.post("/delete",function(req,res){
+    const checkdItemId=req.body.checkbox;
+    const listName=req.body.listName;
+
+    if(listName==="today"){
+        Item.findByIdAndRemove(checkdItemId,function(err){
+            if(!err){
+                console.log("successfully deleted");
+            res.redirect("/");
+            }
+        });
+
+    }else{
+
+        List.findOneAndUpdate({name: listName},{$pull:{items:{_id:checkdItemId}}},function(err,foundList){
+            if(!err){
+                res.redirect("/"+listName);
+            }
+        });
+    }
+
+    
+});
+
+
+
+
+app.get("/about",function(req,res){
+    res.render("about")
+})
+
+
+app.listen(3000,function(){
+    console.log("server started on port 3000")
+})
